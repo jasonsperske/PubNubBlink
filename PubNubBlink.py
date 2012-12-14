@@ -1,5 +1,5 @@
 import ConfigParser
-from Queue import Queue
+from collections import deque
 import re
 import string
 import subprocess
@@ -10,7 +10,7 @@ import time
 from Pubnub import Pubnub
 
 ## Initiate Class
-blink_queue = Queue()
+blink_queue = deque(maxlen=5)
 
 config = ConfigParser.ConfigParser()
 config.read('PubNubBlink.cfg')
@@ -35,25 +35,30 @@ print("My UUID is: "+pubnub.uuid)
 
 channel = config.get('PubNub', 'channel')
 
-def receive(data) :
+def receive(data):
     message = data['text']
 
     for pattern in patterns:
         if re.match(pattern, message):
-            blink_queue.put(patterns[pattern])
+            blink_queue.append(patterns[pattern])
             break
     return True
 
-def blinker(q) :
+def blinker(q):
     while True:
-        args = q.get().split()
-        subprocess.Popen(
-            [blink_app] + args,
-            startupinfo=startupinfo,
-            stderr=subprocess.PIPE,
-            stdout=subprocess.PIPE)
-        time.sleep(blink_wait)
-        q.task_done()
+        try:
+            args = q.popleft().split()
+        except IndexError:
+            ##Wait for more work
+            time.sleep(blink_wait)
+        else:
+            subprocess.Popen(
+                [blink_app] + args,
+                startupinfo=startupinfo,
+                stderr=subprocess.PIPE,
+                stdout=subprocess.PIPE)
+            ##Wait for the blinking to stop
+            time.sleep(blink_wait)
 
 def subscribe():
     print("Listening for messages on '%s' channel..." % channel)
