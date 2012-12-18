@@ -62,17 +62,28 @@ def blinker(q):
 
 def subscribe():
     print("Listening for messages on '%s' channel..." % channel)
+    
     pubnub.subscribe({
         'channel'  : channel,
         'callback' : receive
     })
 
-blink_worker = Thread(target=blinker, args=(blink_queue,))
-blink_worker.daemon=True
-blink_worker.start()
+try:
+    """Blink to know that the script is starting"""
+    subprocess.Popen(
+                [blink_app] + ["-m", "100", "--blink", "3"],
+                startupinfo=startupinfo,
+                stderr=subprocess.PIPE,
+                stdout=subprocess.PIPE)
+    blink_worker = Thread(target=blinker, args=(blink_queue,))
+    blink_worker.daemon=True
+    blink_worker.start()
 
-sub_thread = Thread(target=subscribe)
-sub_thread.daemon=True
-sub_thread.start()
+    sub_thread = Thread(target=subscribe)
+    sub_thread.daemon=True
+    sub_thread.start()
 
-sub_thread.join()
+    sub_thread.join()
+except Exception, e:
+    print("Missing blink-tool!  Go to http://blink1.mthing.com/")
+    print(e)
